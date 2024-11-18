@@ -63,6 +63,49 @@ namespace ProyectoBackendCsharp.Controllers
         }
 
         [AllowAnonymous] // Permite el acceso anónimo a este método.
+        [HttpGet("onlyShow")] // Define una ruta HTTP GET para este método.
+        public IActionResult Listar(
+            string projectName, string tableName, 
+            [FromQuery] List<string> selectedColumns
+        )
+        {
+            if (string.IsNullOrWhiteSpace(tableName)) // Verifica si el nombre de la tabla está vacío o solo contiene espacios en blanco.
+                return BadRequest("El nombre de la tabla no puede estar vacío.");
+
+            if (selectedColumns == null || selectedColumns.Count == 0) // Verifica si las columnas seleccionadas están vacías.
+                return BadRequest("Debe especificar al menos una columna para mostrar.");
+
+            try
+            {
+                // Construir la lista de columnas seleccionadas.
+                string columnas = string.Join(", ", selectedColumns);
+
+                // Construir la consulta SQL.
+                string comandoSQL = $"SELECT {columnas} FROM {tableName}";
+
+                // Ejecutar la consulta y procesar los resultados.
+                var lista = new List<Dictionary<string, object?>>();
+                controlConexion.AbrirBd();
+                var tabla = controlConexion.EjecutarConsultaSql(comandoSQL, null);
+                controlConexion.CerrarBd();
+
+                foreach (DataRow fila in tabla.Rows)
+                {
+                    var propiedades = fila.Table.Columns.Cast<DataColumn>()
+                                        .ToDictionary(col => col.ColumnName, col => fila[col] == DBNull.Value ? null : fila[col]);
+                    lista.Add(propiedades);
+                }
+
+                return Ok(lista); // Retorna la lista de filas en formato JSON.
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error interno del servidor: {ex.Message}"); // Maneja errores inesperados.
+            }
+        }
+
+
+        [AllowAnonymous] // Permite el acceso anónimo a este método.
         [HttpGet("{keyName}/{value}")] // Define una ruta HTTP GET con parámetros adicionales.
         public IActionResult GetByKey(string projectName, string tableName, string keyName, string value) // Método que obtiene una fila específica basada en una clave.
         {
