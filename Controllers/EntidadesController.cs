@@ -490,6 +490,71 @@ namespace ProyectoBackendCsharp.Controllers
             }
         }
 
+        //agregado por mi
+        [AllowAnonymous]
+        [HttpGet("Fulljoin")]
+        public IActionResult GetFullJoinedData(
+            string projectName, string tableName,
+            [FromQuery] List<string> joinTables, // Lista de tablas de unión
+            [FromQuery] List<string> onConditions, // Lista de condiciones ON
+            [FromQuery] List<string> selectedColumns // Lista de columnas específicas
+        )
+        {
+            // Verifica si los parámetros requeridos no están vacíos
+            if (string.IsNullOrWhiteSpace(tableName) || joinTables == null || joinTables.Count == 0 || onConditions == null || onConditions.Count == 0 || selectedColumns == null || selectedColumns.Count == 0)
+            {
+                return BadRequest("El nombre de la tabla principal, las tablas de unión, las condiciones ON y las columnas de selección no pueden estar vacíos.");
+            }
+
+            // Verifica si el número de tablas de unión y condiciones ON es el mismo
+            if (joinTables.Count != onConditions.Count)
+            {
+                return BadRequest("El número de tablas de unión y condiciones ON debe ser igual.");
+            }
+
+            controlConexion.AbrirBd();
+
+            // Intenta ejecutar la consulta SQL
+            try
+            {
+                // Construcción del SELECT
+                var selectClause = string.Join(", ", selectedColumns);
+
+                // Construcción de los JOINs
+                var joins = new StringBuilder();
+                for (int i = 0; i < joinTables.Count; i++)
+                {
+                    joins.Append($" FULL OUTER JOIN {joinTables[i]} ON {onConditions[i]}");
+                }
+
+                // Construcción de la consulta SQL final
+                string query = $"SELECT {selectClause} FROM {tableName}{joins}";
+                Console.WriteLine($"Executing SQL query: {query}");
+
+                // Ejecuta la consulta SQL y obtiene el resultado
+                var resultado = controlConexion.EjecutarConsultaSql(query, Array.Empty<DbParameter>());
+
+                // Convierte el resultado a un formato JSON
+                var filas = resultado.AsEnumerable()
+                                        .Select(row => resultado.Columns.Cast<DataColumn>()
+                                                    .ToDictionary(col => col.ColumnName, col => row[col] == DBNull.Value ? null : row[col]))
+                                        .ToList();
+
+                return Ok(filas); // Retorna el resultado en formato JSON.
+
+            }
+            catch (Exception ex) // Captura cualquier excepción que ocurra durante la ejecución
+            {
+                // Muestra el mensaje de la excepción en la consola
+                Console.WriteLine($"Exception occurred: {ex.Message}");
+                return StatusCode(500, $"Error interno del servidor: {ex.Message}");
+            }
+            finally // Se ejecuta después de la ejecución del bloque try o catch
+            {
+                controlConexion.CerrarBd();
+            }
+        }
+
         [AllowAnonymous]
         [HttpGet("getPk")]
         public IActionResult GetPrimaryKey(string tableName)
